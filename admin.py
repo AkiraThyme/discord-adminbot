@@ -901,6 +901,10 @@ async def sync_roles(guild_id: int, ctx: Dict[str, Any] = Depends(moderator_cont
     return {"synced": len(rows)}
 
 
+@api.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 # --- ON_GUILD_JOIN EVENT ---
 # This function runs automatically whenever the bot is added to a new server.
 @bot.event
