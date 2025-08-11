@@ -42,13 +42,13 @@ async def lifespan(app: FastAPI):
 api = FastAPI(lifespan=lifespan)
 
 origins = [
-    "https://swarmdiscordbot.vercel.app", # Your live frontend
-    "http://localhost:5173"  # Your local frontend for testing
+    "https://swarmdiscordbot.vercel.app",
+    "http://localhost:5173"
 ]
 
 api.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, # Your Vue app's origin
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

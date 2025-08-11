@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/adminbot.iml" filepath="$PROJECT_DIR$/.idea/adminbot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../adminbot-ui/.idea/adminbot-ui.iml" filepath="$PROJECT_DIR$/../adminbot-ui/.idea/adminbot-ui.iml" />
+    </modules>
+  </component>
+</project>
