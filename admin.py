@@ -216,6 +216,8 @@ async def lifespan(app: FastAPI):
     print("--- API LIFESPAN: Starting up... ---")
     
     asyncio.create_task(bot.start(TOKEN))
+
+    await asyncio.sleep(0) 
     
     print("--- API LIFESPAN: Waiting for bot to be ready... ---")
     await bot.wait_until_ready()
