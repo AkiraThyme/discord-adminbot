@@ -902,7 +902,7 @@ async def sync_roles(guild_id: int, ctx: Dict[str, Any] = Depends(moderator_cont
     supabase.table("server_roles").upsert(rows).execute()
     return {"synced": len(rows)}
 
-
+@api.head("/health")
 @api.get("/health")
 def health_check():
     return {"status": "ok"}
