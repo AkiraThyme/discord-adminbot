@@ -213,13 +213,12 @@ TICKET_RULES = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("--- API LIFESPAN: Starting up... ---")
+    print("--- API LIFESPAN: Logging bot in... ---")
+    await bot.login(TOKEN)
     
-    asyncio.create_task(bot.start(TOKEN))
-
-    await asyncio.sleep(0) 
+    print("--- API LIFESPAN: Connecting bot to the gateway... ---")
+    asyncio.create_task(bot.connect(reconnect=True))
     
-    print("--- API LIFESPAN: Waiting for bot to be ready... ---")
     await bot.wait_until_ready()
     print("--- API LIFESPAN: Bot is ready. API is now live. ---")
     
@@ -227,6 +226,7 @@ async def lifespan(app: FastAPI):
     
     print("--- API LIFESPAN: Shutting down... ---")
     await bot.close()
+
 
 api = FastAPI(lifespan=lifespan)
 
