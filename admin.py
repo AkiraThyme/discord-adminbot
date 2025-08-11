@@ -13,12 +13,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import time
 from datetime import timedelta
+from contextlib import asynccontextmanager
 load_dotenv()
 
 TOKEN = os.getenv('BOT_TOKEN')
 S_URL = os.getenv('SUPABASE_URL')
 S_KEY = os.getenv('SUPABASE_KEY')
-REPORT_ISSUE_CHANNEL_ID = int(os.getenv('REPORT_ISSUE_CHANNEL_ID') or '1312408228281319454')
+REPORT_ISSUE_CHANNEL_ID = int('1312408228281319454')
 
 supabase: Client = create_client(S_URL, S_KEY)
 
@@ -210,12 +211,19 @@ TICKET_RULES = [
     f"Ticket creation cooldown: {int(TICKET_COOLDOWN_SECONDS)}s.",
 ]
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handles the bot's startup and shutdown."""
-    print("API starting up...")
+    print("--- API LIFESPAN: Starting up... ---")
+    
     asyncio.create_task(bot.start(TOKEN))
+    
+    print("--- API LIFESPAN: Waiting for bot to be ready... ---")
+    await bot.wait_until_ready()
+    print("--- API LIFESPAN: Bot is ready. API is now live. ---")
+    
     yield
-    print("API shutting down, closing bot connection...")
+    
+    print("--- API LIFESPAN: Shutting down... ---")
     await bot.close()
 
 api = FastAPI(lifespan=lifespan)
