@@ -41,7 +41,6 @@ bot_ready = asyncio.Event()
 security = HTTPBearer(auto_error=False)
 
 def _extract_discord_id_from_supabase_user(user: Any) -> Optional[str]:
-    """Try to get the Discord user id from Supabase user metadata or identities."""
     if user is None:
         return None
     # Common places where Supabase (Discord provider) stores the provider id
@@ -615,19 +614,44 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
         print("Dashboard WebSocket disconnected.")
 
-# NEW: Endpoint to list all servers the bot is in
 @api.get("/servers")
-async def get_servers():
-    """Returns a list of all servers (guilds) the bot is connected to."""
+async def get_servers(creds: Optional[HTTPAuthorizationCredentials] = Security(security)):
     await bot_ready.wait()
-    server_list = []
+
+    user = await get_current_user(creds)
+    discord_id = _extract_discord_id_from_supabase_user(user)
+    if not discord_id:
+        raise HTTPException(status_code=403, detail="No linked discord account found.")
+
+    visible: list[dict] = []
     for guild in bot.guilds:
-        server_list.append({
-            "id": str(guild.id),
-            "name": guild.name,
-            "icon_url": str(guild.icon.url) if guild.icon else None
-        })
-    return server_list
+        try:
+            # Fast check: owner
+            if guild.owner_id == int(discord_id):
+                visible.append({
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "icon_url": str(guild.icon.url) if guild.icon else None
+                })
+                continue
+
+            try:
+                member = await guild.fetch_member(int(discord_id))
+            except Exception:
+                member = None
+
+            if member:
+                perms = member.guild_permissions
+                if perms.administrator or perms.manage_guild:
+                    visible.append({
+                        "id": str(guild.id),
+                        "name": guild.name,
+                        "icon_url": str(guild.icon.url) if guild.icon else None
+                    })
+        except Exception:
+            continue
+
+    return visible
 
 # Helper function to get a guild and handle errors
 async def get_guild_or_404(guild_id: int):
@@ -967,22 +991,22 @@ async def on_ready():
     print("Bot is ready and API endpoints are now active.")
 
 @bot.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
         return
     
     try:
-        supabase.table('activity_log').insert({
-            "guild_id": str(message.guild.id),
+        supabase.table('server_activity_logs').insert({
+            "guild_id": str(message.guild.id) if message.guild else None,
             "user_id": str(message.author.id),
             "username": message.author.name,
             "action": "sent_message",
-            "details": f"in #{message.channel.name}"
+            "content": message.content,
+            "details": f"in #{message.channel.name}" if hasattr(message, "channel") else None
         }).execute()
     except Exception as e:
         print(f"Error logging message activity: {e}")
 
-    # Reset ticket inactivity timer when message is posted inside a ticket thread
     try:
         if isinstance(message.channel, discord.Thread) and message.channel.owner_id == bot.user.id:
             schedule_ticket_timer(message.channel)
@@ -992,29 +1016,41 @@ async def on_message(message):
     await bot.process_commands(message)
 
 @bot.event
-async def on_voice_state_update(member, before, after):
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
     if member.bot:
         return
 
-    action, details = None, None
-    if not before.channel and after.channel:
-        action = "joined_vc"
-        details = f"#{after.channel.name}"
-    elif before.channel and not after.channel:
-        action = "left_vc"
-        details = f"#{before.channel.name}"
+    guild_id = str(member.guild.id)
+    if before.channel is None and after.channel is not None:
+        supabase.table("server_activity_logs").insert({
+            "guild_id": guild_id,
+            "user_id": str(member.id),
+            "activity_type": "voice_join",
+            "channel_id": str(after.channel.id),
+        }).execute()
 
-    if action:
-        try:
-            supabase.table('activity_log').insert({
-                "guild_id": str(member.guild.id),
-                "user_id": str(member.id),
-                "username": member.name,
-                "action": action,
-                "details": details
-            }).execute()
-        except Exception as e:
-            print(f"Error logging voice activity: {e}")
+    # User left a voice channel
+    elif before.channel is not None and after.channel is None:
+        supabase.table("server_activity_logs").insert({
+            "guild_id": guild_id,
+            "user_id": str(member.id),
+            "activity_type": "voice_leave",
+            "channel_id": str(before.channel.id),
+        }).execute()
+
+    # User switched channels
+    elif before.channel != after.channel:
+        supabase.table("server_activity_logs").insert([{
+            "guild_id": guild_id,
+            "user_id": str(member.id),
+            "activity_type": "voice_leave",
+            "channel_id": str(before.channel.id),
+        }, {
+            "guild_id": guild_id,
+            "user_id": str(member.id),
+            "activity_type": "voice_join",
+            "channel_id": str(after.channel.id),
+        }]).execute()
 
 @bot.event
 async def on_presence_update(before, after):
