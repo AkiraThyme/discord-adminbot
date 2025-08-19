@@ -1000,6 +1000,7 @@ async def on_message(message: discord.Message):
             "guild_id": str(message.guild.id) if message.guild else None,
             "user_id": str(message.author.id),
             "username": message.author.name,
+            "activity_type": "message_sent",
             "action": "sent_message",
             "content": message.content,
             "details": f"in #{message.channel.name}" if hasattr(message, "channel") else None
